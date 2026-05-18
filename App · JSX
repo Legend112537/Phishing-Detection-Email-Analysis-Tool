@@ -1,0 +1,185 @@
+import { useState } from 'react'
+import Header from './components/Header.jsx'
+import EmailInput from './components/EmailInput.jsx'
+import AnalysisResults from './components/AnalysisResults.jsx'
+import ApiKeyModal from './components/ApiKeyModal.jsx'
+import { analyzeEmail } from './utils/anthropic.js'
+import { parseRawEmail } from './utils/emailParser.js'
+import './App.css'
+
+export default function App() {
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('phishguard_api_key') || '')
+  const [showApiModal, setShowApiModal] = useState(false)
+  const [emailData, setEmailData] = useState({ subject: '', sender: '', body: '', headers: '' })
+  const [inputMode, setInputMode] = useState('fields') // 'fields' | 'raw'
+  const [rawEmail, setRawEmail] = useState('')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleApiKeySave = (key) => {
+    setApiKey(key)
+    localStorage.setItem('phishguard_api_key', key)
+    setShowApiModal(false)
+  }
+
+  const handleAnalyze = async () => {
+    if (!apiKey) {
+      setShowApiModal(true)
+      return
+    }
+
+    const data = inputMode === 'raw' ? parseRawEmail(rawEmail) : emailData
+
+    if (!data.body && !data.subject && !data.sender) {
+      setError('Please provide at least the email body or subject to analyze.')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setResult(null)
+
+    try {
+      // Inject API key into fetch (override the utility temporarily)
+      const analysis = await analyzeEmailWithKey(data, apiKey)
+      setResult(analysis)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleReset = () => {
+    setResult(null)
+    setError(null)
+    setEmailData({ subject: '', sender: '', body: '', headers: '' })
+    setRawEmail('')
+  }
+
+  return (
+    <div className="app">
+      <Header onApiKeyClick={() => setShowApiModal(true)} hasApiKey={!!apiKey} />
+
+      <main className="main">
+        {!result ? (
+          <EmailInput
+            emailData={emailData}
+            setEmailData={setEmailData}
+            rawEmail={rawEmail}
+            setRawEmail={setRawEmail}
+            inputMode={inputMode}
+            setInputMode={setInputMode}
+            onAnalyze={handleAnalyze}
+            loading={loading}
+            error={error}
+          />
+        ) : (
+          <AnalysisResults result={result} emailData={emailData} onReset={handleReset} />
+        )}
+      </main>
+
+      {showApiModal && (
+        <ApiKeyModal
+          currentKey={apiKey}
+          onSave={handleApiKeySave}
+          onClose={() => setShowApiModal(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Wrapper to inject API key into the request
+async function analyzeEmailWithKey(emailData, apiKey) {
+  const { subject = '', sender = '', body = '', headers = '' } = emailData
+
+  const systemPrompt = `You are an expert cybersecurity analyst specializing in phishing detection and email threat analysis. 
+Analyze the provided email and return a detailed JSON report. Be precise, technical, and thorough.
+
+Your response must be ONLY valid JSON with this exact structure:
+{
+  "riskScore": <number 0-100>,
+  "verdict": "<SAFE|SUSPICIOUS|PHISHING|MALICIOUS>",
+  "confidence": <number 0-100>,
+  "summary": "<2-3 sentence executive summary>",
+  "indicators": [
+    {
+      "category": "<SOCIAL_ENGINEERING|SPOOFING|MALICIOUS_URL|URGENCY|IMPERSONATION|CREDENTIAL_HARVESTING|MALWARE|DATA_EXFILTRATION|OTHER>",
+      "severity": "<LOW|MEDIUM|HIGH|CRITICAL>",
+      "title": "<short title>",
+      "description": "<detailed explanation>",
+      "evidence": "<specific text or pattern found>"
+    }
+  ],
+  "urlAnalysis": [
+    {
+      "url": "<url found>",
+      "suspicious": <boolean>,
+      "reason": "<why it is or isn't suspicious>"
+    }
+  ],
+  "senderAnalysis": {
+    "displayName": "<extracted display name>",
+    "emailAddress": "<extracted email>",
+    "domain": "<sender domain>",
+    "spoofingDetected": <boolean>,
+    "spoofingDetails": "<explanation if spoofing detected>"
+  },
+  "tactics": ["<list of social engineering or attack tactics used>"],
+  "recommendations": ["<actionable recommendations for the recipient>"],
+  "technicalDetails": {
+    "headerAnomalies": ["<list of header anomalies if headers provided>"],
+    "encodingTricks": "<any encoding obfuscation detected>",
+    "urgencyLevel": "<NONE|LOW|MEDIUM|HIGH|EXTREME>"
+  }
+}
+
+Scoring: 0-20 Safe, 21-40 Low risk, 41-60 Suspicious, 61-80 High risk, 81-100 Malicious.
+Return ONLY the JSON object.`
+
+  const userMessage = `Analyze this email:
+
+SENDER: ${sender || 'Not provided'}
+SUBJECT: ${subject || 'Not provided'}
+${headers ? `HEADERS:\n${headers}\n\n` : ''}BODY:
+${body || 'No body provided'}`
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    if (response.status === 401) throw new Error('Invalid API key. Please check your Anthropic API key.')
+    if (response.status === 429) throw new Error('Rate limit exceeded. Please wait a moment and try again.')
+    throw new Error(err.error?.message || `API error: ${response.status}`)
+  }
+
+  const data = await response.json()
+  const rawText = data.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+
+  const cleaned = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    throw new Error('Failed to parse AI analysis. Please try again.')
+  }
+}
