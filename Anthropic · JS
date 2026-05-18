@@ -1,0 +1,109 @@
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
+const MODEL = 'claude-sonnet-4-20250514'
+
+/**
+ * Analyzes email content for phishing indicators using Claude AI.
+ * @param {Object} emailData - The email data to analyze
+ * @param {string} emailData.subject - Email subject line
+ * @param {string} emailData.sender - Sender email address
+ * @param {string} emailData.body - Email body content
+ * @param {string} emailData.headers - Raw email headers (optional)
+ * @returns {Promise<Object>} Analysis result
+ */
+export async function analyzeEmail(emailData) {
+  const { subject = '', sender = '', body = '', headers = '' } = emailData
+
+  const systemPrompt = `You are an expert cybersecurity analyst specializing in phishing detection and email threat analysis. 
+Analyze the provided email and return a detailed JSON report. Be precise, technical, and thorough.
+
+Your response must be ONLY valid JSON with this exact structure:
+{
+  "riskScore": <number 0-100>,
+  "verdict": "<SAFE|SUSPICIOUS|PHISHING|MALICIOUS>",
+  "confidence": <number 0-100>,
+  "summary": "<2-3 sentence executive summary>",
+  "indicators": [
+    {
+      "category": "<SOCIAL_ENGINEERING|SPOOFING|MALICIOUS_URL|URGENCY|IMPERSONATION|CREDENTIAL_HARVESTING|MALWARE|DATA_EXFILTRATION|OTHER>",
+      "severity": "<LOW|MEDIUM|HIGH|CRITICAL>",
+      "title": "<short title>",
+      "description": "<detailed explanation>",
+      "evidence": "<specific text or pattern found>"
+    }
+  ],
+  "urlAnalysis": [
+    {
+      "url": "<url found>",
+      "suspicious": <boolean>,
+      "reason": "<why it is or isn't suspicious>"
+    }
+  ],
+  "senderAnalysis": {
+    "displayName": "<extracted display name>",
+    "emailAddress": "<extracted email>",
+    "domain": "<sender domain>",
+    "spoofingDetected": <boolean>,
+    "spoofingDetails": "<explanation if spoofing detected>"
+  },
+  "tactics": ["<list of social engineering or attack tactics used>"],
+  "recommendations": ["<actionable recommendations for the recipient>"],
+  "technicalDetails": {
+    "headerAnomalies": ["<list of header anomalies if headers provided>"],
+    "encodingTricks": "<any encoding obfuscation detected>",
+    "urgencyLevel": "<NONE|LOW|MEDIUM|HIGH|EXTREME>"
+  }
+}
+
+Scoring guide:
+- 0-20: Safe, no phishing indicators
+- 21-40: Low risk, minor concerns
+- 41-60: Suspicious, investigate further  
+- 61-80: High risk, likely phishing
+- 81-100: Malicious, confirmed phishing/attack
+
+Be thorough — analyze grammar, urgency language, sender legitimacy, link patterns, impersonation attempts, and psychological manipulation tactics.`
+
+  const userMessage = `Analyze this email for phishing indicators:
+
+SENDER: ${sender || 'Not provided'}
+
+SUBJECT: ${subject || 'Not provided'}
+
+${headers ? `HEADERS:\n${headers}\n\n` : ''}BODY:
+${body || 'No body content provided'}
+
+Return only the JSON analysis.`
+
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.error?.message || `API error: ${response.status}`)
+  }
+
+  const data = await response.json()
+  const rawText = data.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+
+  const cleaned = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    throw new Error('Failed to parse AI analysis response. Please try again.')
+  }
+}
