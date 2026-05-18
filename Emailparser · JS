@@ -1,0 +1,86 @@
+/**
+ * Attempts to parse raw email content (EML format or plain paste)
+ * into structured fields.
+ */
+export function parseRawEmail(raw) {
+  if (!raw || raw.trim().length === 0) {
+    return { subject: '', sender: '', body: '', headers: '' }
+  }
+
+  const lines = raw.split('\n')
+  const result = { subject: '', sender: '', body: '', headers: '' }
+
+  // Check if it looks like a raw email with headers
+  const hasHeaders =
+    lines[0].match(/^(From|To|Subject|Date|Message-ID|MIME|Received|Return-Path):/i)
+
+  if (hasHeaders) {
+    let inHeaders = true
+    const headerLines = []
+    const bodyLines = []
+
+    for (const line of lines) {
+      if (inHeaders && line.trim() === '') {
+        inHeaders = false
+        continue
+      }
+      if (inHeaders) {
+        headerLines.push(line)
+      } else {
+        bodyLines.push(line)
+      }
+    }
+
+    result.headers = headerLines.join('\n')
+    result.body = bodyLines.join('\n').trim()
+
+    // Extract common headers
+    for (const line of headerLines) {
+      const subjectMatch = line.match(/^Subject:\s*(.+)/i)
+      if (subjectMatch) result.subject = subjectMatch[1].trim()
+
+      const fromMatch = line.match(/^From:\s*(.+)/i)
+      if (fromMatch) result.sender = fromMatch[1].trim()
+    }
+  } else {
+    // Treat the whole thing as body text
+    result.body = raw.trim()
+  }
+
+  return result
+}
+
+/**
+ * Extracts URLs from text content.
+ */
+export function extractUrls(text) {
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^\[\]`]+/gi
+  const matches = text.match(urlRegex) || []
+  return [...new Set(matches)]
+}
+
+/**
+ * Checks for common phishing keywords (client-side pre-screen).
+ */
+export function quickPhishScan(text) {
+  const keywords = [
+    'verify your account',
+    'confirm your password',
+    'urgent action required',
+    'your account has been suspended',
+    'click here immediately',
+    'limited time offer',
+    'you have won',
+    'congratulations you',
+    'wire transfer',
+    'western union',
+    'gift card',
+    'unusual sign-in activity',
+    'update your payment',
+    'validate your information',
+    'security alert',
+  ]
+
+  const lower = text.toLowerCase()
+  return keywords.filter((kw) => lower.includes(kw))
+}
