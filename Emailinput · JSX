@@ -1,0 +1,239 @@
+import { useState } from 'react'
+import { Search, Upload, FileText, Zap, AlertCircle, ChevronDown } from 'lucide-react'
+import { quickPhishScan } from '../utils/emailParser.js'
+import './EmailInput.css'
+
+const EXAMPLE_PHISHING = {
+  sender: 'security-alert@paypa1-verify.com',
+  subject: 'URGENT: Your PayPal Account Has Been Limited - Immediate Action Required',
+  body: `Dear Valued Customer,
+
+We have detected unusual activity on your PayPal account and have temporarily limited your access. 
+
+To restore full access to your account, you MUST verify your information within 24 hours or your account will be permanently suspended.
+
+Click the link below to verify your account immediately:
+http://paypal-secure-verify.xyz/confirm?token=abc123
+
+You will need to provide:
+- Full name and date of birth
+- Credit card number and CVV
+- Social Security Number
+- PayPal password
+
+Failure to complete verification within 24 hours will result in permanent account closure and fund seizure.
+
+This is an automated security notification. Do not reply to this email.
+
+PayPal Security Team
+paypal.com`,
+  headers: '',
+}
+
+export default function EmailInput({
+  emailData,
+  setEmailData,
+  rawEmail,
+  setRawEmail,
+  inputMode,
+  setInputMode,
+  onAnalyze,
+  loading,
+  error,
+}) {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
+  const quickFlags = quickPhishScan(
+    (emailData.body || '') + ' ' + (emailData.subject || '') + ' ' + rawEmail
+  )
+
+  const handleLoadExample = () => {
+    setInputMode('fields')
+    setEmailData(EXAMPLE_PHISHING)
+  }
+
+  const isEmpty =
+    inputMode === 'fields'
+      ? !emailData.body && !emailData.subject && !emailData.sender
+      : !rawEmail.trim()
+
+  return (
+    <div className="email-input animate-fade-in">
+      {/* Hero */}
+      <div className="ei-hero">
+        <div className="ei-hero-badge">
+          <span className="ei-hero-dot" />
+          AI-Powered Detection
+        </div>
+        <h1 className="ei-hero-title">
+          Detect Phishing Emails<br />
+          <span className="ei-hero-accent">Instantly</span>
+        </h1>
+        <p className="ei-hero-desc">
+          Paste any email below. Our AI analyzes sender authenticity, malicious links,
+          social engineering tactics, and more — in seconds.
+        </p>
+      </div>
+
+      {/* Mode Toggle */}
+      <div className="ei-mode-toggle">
+        <button
+          className={`ei-mode-btn ${inputMode === 'fields' ? 'active' : ''}`}
+          onClick={() => setInputMode('fields')}
+        >
+          <FileText size={14} strokeWidth={1.5} />
+          Structured Input
+        </button>
+        <button
+          className={`ei-mode-btn ${inputMode === 'raw' ? 'active' : ''}`}
+          onClick={() => setInputMode('raw')}
+        >
+          <Upload size={14} strokeWidth={1.5} />
+          Raw / EML Paste
+        </button>
+      </div>
+
+      {/* Input Card */}
+      <div className="ei-card">
+        {inputMode === 'fields' ? (
+          <div className="ei-fields">
+            <div className="ei-field-row">
+              <div className="ei-field">
+                <label htmlFor="sender" className="ei-label">From</label>
+                <input
+                  id="sender"
+                  type="text"
+                  className="ei-input"
+                  placeholder="sender@example.com or Display Name <email@domain.com>"
+                  value={emailData.sender}
+                  onChange={(e) => setEmailData({ ...emailData, sender: e.target.value })}
+                />
+              </div>
+              <div className="ei-field">
+                <label htmlFor="subject" className="ei-label">Subject</label>
+                <input
+                  id="subject"
+                  type="text"
+                  className="ei-input"
+                  placeholder="Email subject line"
+                  value={emailData.subject}
+                  onChange={(e) => setEmailData({ ...emailData, subject: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="ei-field">
+              <label htmlFor="body" className="ei-label">
+                Email Body <span className="ei-label-required">*</span>
+              </label>
+              <textarea
+                id="body"
+                className="ei-textarea"
+                placeholder="Paste the full email body here, including any links, greetings, and calls to action..."
+                value={emailData.body}
+                onChange={(e) => setEmailData({ ...emailData, body: e.target.value })}
+                rows={10}
+              />
+            </div>
+
+            {/* Advanced: Headers */}
+            <button
+              className="ei-advanced-toggle"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              <ChevronDown
+                size={14}
+                strokeWidth={1.5}
+                style={{ transform: showAdvanced ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+              />
+              Advanced: Raw Headers
+            </button>
+
+            {showAdvanced && (
+              <div className="ei-field" style={{ marginTop: '0.75rem' }}>
+                <label htmlFor="headers" className="ei-label">
+                  Email Headers <span className="ei-label-optional">(optional — improves spoofing detection)</span>
+                </label>
+                <textarea
+                  id="headers"
+                  className="ei-textarea ei-textarea--mono"
+                  placeholder="Received: from mail.example.com&#10;From: ...&#10;Reply-To: ..."
+                  value={emailData.headers}
+                  onChange={(e) => setEmailData({ ...emailData, headers: e.target.value })}
+                  rows={5}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="ei-field">
+            <label htmlFor="raw" className="ei-label">
+              Paste Raw Email / EML Content
+            </label>
+            <textarea
+              id="raw"
+              className="ei-textarea ei-textarea--mono"
+              placeholder="Paste the full raw email here, including headers and body. The parser will extract fields automatically.&#10;&#10;Example:&#10;From: sender@domain.com&#10;Subject: Your subject&#10;&#10;Email body goes here..."
+              value={rawEmail}
+              onChange={(e) => setRawEmail(e.target.value)}
+              rows={14}
+            />
+          </div>
+        )}
+
+        {/* Quick flags preview */}
+        {quickFlags.length > 0 && (
+          <div className="ei-quick-flags">
+            <AlertCircle size={13} strokeWidth={1.5} />
+            <span>Pre-scan detected: </span>
+            {quickFlags.slice(0, 3).map((f, i) => (
+              <span key={i} className="ei-quick-flag-badge">"{f}"</span>
+            ))}
+            {quickFlags.length > 3 && <span className="ei-quick-flag-more">+{quickFlags.length - 3} more</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="ei-error" role="alert">
+          <AlertCircle size={15} strokeWidth={1.5} />
+          {error}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="ei-actions">
+        <button
+          className="ei-btn-analyze"
+          onClick={onAnalyze}
+          disabled={loading || isEmpty}
+          aria-busy={loading}
+        >
+          {loading ? (
+            <>
+              <span className="ei-spinner" aria-hidden="true" />
+              Analyzing...
+            </>
+          ) : (
+            <>
+              <Zap size={16} strokeWidth={1.5} />
+              Analyze Email
+            </>
+          )}
+        </button>
+
+        <button className="ei-btn-example" onClick={handleLoadExample} disabled={loading}>
+          Load Example Phishing Email
+        </button>
+      </div>
+
+      {loading && (
+        <div className="ei-loading-status" aria-live="polite">
+          <span className="ei-loading-bar" />
+          <span>AI is scanning for phishing indicators, malicious URLs, and social engineering tactics...</span>
+        </div>
+      )}
+    </div>
+  )
+}
