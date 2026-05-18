@@ -1,0 +1,131 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-logo {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--accent-blue-dim), rgba(99, 130, 255, 0.05));
+  border: 1px solid var(--border-active);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-blue);
+  flex-shrink: 0;
+}
+
+.header-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.header-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.header-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.header-btn--ghost {
+  color: var(--text-secondary);
+}
+
+.header-btn--outline {
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.header-btn--outline:hover {
+  border-color: var(--border-active);
+  color: var(--accent-blue);
+}
+
+.header-btn--active {
+  border-color: rgba(52, 211, 153, 0.3);
+  color: var(--success);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.header-btn--active:hover {
+  background: rgba(52, 211, 153, 0.12);
+}
+
+.header-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse-glow 2s infinite;
+}
+
+@media (max-width: 520px) {
+  .header-inner {
+    padding: 0 1rem;
+  }
+  .header-sub {
+    display: none;
+  }
+  .header-btn span {
+    display: none;
+  }
+  .header-btn {
+    padding: 0 10px;
+  }
+}
