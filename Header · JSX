@@ -1,0 +1,42 @@
+import { ShieldAlert, Key, Github } from 'lucide-react'
+import './Header.css'
+
+export default function Header({ onApiKeyClick, hasApiKey }) {
+  return (
+    <header className="header">
+      <div className="header-inner">
+        <div className="header-brand">
+          <div className="header-logo">
+            <ShieldAlert size={22} strokeWidth={1.5} />
+          </div>
+          <div>
+            <span className="header-title">PhishGuard</span>
+            <span className="header-sub">AI Email Threat Analyzer</span>
+          </div>
+        </div>
+
+        <div className="header-actions">
+          <a
+            href="https://github.com/yourusername/phishing-detector"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-btn header-btn--ghost"
+            aria-label="View on GitHub"
+          >
+            <Github size={16} strokeWidth={1.5} />
+            <span>GitHub</span>
+          </a>
+
+          <button
+            className={`header-btn ${hasApiKey ? 'header-btn--active' : 'header-btn--outline'}`}
+            onClick={onApiKeyClick}
+          >
+            <Key size={14} strokeWidth={1.5} />
+            <span>{hasApiKey ? 'API Key Set' : 'Set API Key'}</span>
+            {hasApiKey && <span className="header-dot" aria-label="Connected" />}
+          </button>
+        </div>
+      </div>
+    </header>
+  )
+}
