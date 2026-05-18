@@ -1,0 +1,15 @@
+# 1. Extract the zip and enter the folder
+unzip phishing-detector.zip && cd phishing-detector
+
+# 2. Install dependencies
+npm install
+
+# 3. Test locally
+npm run dev
+
+# 4. Push to GitHub
+git init
+git add .
+git commit -m "Initial commit: PhishGuard AI phishing detector"
+git remote add origin https://github.com/YOURNAME/phishing-detector.git
+git push -u origin main
