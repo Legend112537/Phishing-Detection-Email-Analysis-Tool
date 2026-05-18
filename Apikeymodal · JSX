@@ -1,0 +1,96 @@
+import { useState } from 'react'
+import { X, Key, ExternalLink, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import './ApiKeyModal.css'
+
+export default function ApiKeyModal({ currentKey, onSave, onClose }) {
+  const [value, setValue] = useState(currentKey || '')
+  const [show, setShow] = useState(false)
+
+  const handleSave = () => {
+    if (value.trim()) onSave(value.trim())
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') onClose()
+  }
+
+  const masked = value ? value.slice(0, 7) + '••••••••••••••••' + value.slice(-4) : ''
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Set Anthropic API Key">
+        <button className="modal-close" onClick={onClose} aria-label="Close">
+          <X size={16} strokeWidth={1.5} />
+        </button>
+
+        <div className="modal-header">
+          <div className="modal-icon">
+            <Key size={20} strokeWidth={1.5} />
+          </div>
+          <div>
+            <h2 className="modal-title">Anthropic API Key</h2>
+            <p className="modal-subtitle">Required to run AI-powered analysis</p>
+          </div>
+        </div>
+
+        <div className="modal-body">
+          <div className="modal-field">
+            <label htmlFor="api-key" className="modal-label">API Key</label>
+            <div className="modal-input-wrap">
+              <input
+                id="api-key"
+                type={show ? 'text' : 'password'}
+                className="modal-input"
+                placeholder="sk-ant-api03-..."
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                className="modal-eye"
+                onClick={() => setShow(!show)}
+                aria-label={show ? 'Hide key' : 'Show key'}
+              >
+                {show ? <EyeOff size={14} strokeWidth={1.5} /> : <Eye size={14} strokeWidth={1.5} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="modal-info">
+            <ShieldCheck size={13} strokeWidth={1.5} className="modal-info-icon" />
+            <p>
+              Your key is stored locally in your browser and never sent to any server other than Anthropic's API directly from your browser.
+            </p>
+          </div>
+
+          <a
+            href="https://console.anthropic.com/api-keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="modal-link"
+          >
+            Get your API key from Anthropic Console
+            <ExternalLink size={12} strokeWidth={1.5} />
+          </a>
+        </div>
+
+        <div className="modal-footer">
+          <button className="modal-btn modal-btn--ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="modal-btn modal-btn--primary"
+            onClick={handleSave}
+            disabled={!value.trim()}
+          >
+            Save Key
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
