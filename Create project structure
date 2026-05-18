@@ -1,0 +1,2 @@
+mkdir -p /home/claude/phishing-detector/{src/{components,utils,hooks},public} && echo
+"done"
