@@ -1,0 +1,315 @@
+import {
+  ShieldAlert, ShieldCheck, ShieldX, Shield,
+  AlertTriangle, Link2, User, Tag, Lightbulb,
+  RotateCcw, Download, ChevronDown, ChevronUp,
+  CheckCircle, XCircle, AlertCircle, Info
+} from 'lucide-react'
+import { useState } from 'react'
+import './AnalysisResults.css'
+
+const VERDICT_CONFIG = {
+  SAFE: { label: 'Safe', color: 'success', Icon: ShieldCheck },
+  SUSPICIOUS: { label: 'Suspicious', color: 'warning', Icon: ShieldAlert },
+  PHISHING: { label: 'Phishing', color: 'danger', Icon: ShieldX },
+  MALICIOUS: { label: 'Malicious', color: 'danger', Icon: ShieldX },
+}
+
+const SEVERITY_CONFIG = {
+  LOW: { label: 'Low', color: 'info' },
+  MEDIUM: { label: 'Medium', color: 'warning' },
+  HIGH: { label: 'High', color: 'danger' },
+  CRITICAL: { label: 'Critical', color: 'critical' },
+}
+
+const CATEGORY_ICONS = {
+  SOCIAL_ENGINEERING: Tag,
+  SPOOFING: User,
+  MALICIOUS_URL: Link2,
+  URGENCY: AlertTriangle,
+  IMPERSONATION: User,
+  CREDENTIAL_HARVESTING: ShieldX,
+  MALWARE: ShieldAlert,
+  DATA_EXFILTRATION: ShieldX,
+  OTHER: AlertCircle,
+}
+
+export default function AnalysisResults({ result, onReset }) {
+  const [expandedIndicators, setExpandedIndicators] = useState(new Set())
+
+  if (!result) return null
+
+  const verdict = result.verdict || 'SUSPICIOUS'
+  const config = VERDICT_CONFIG[verdict] || VERDICT_CONFIG.SUSPICIOUS
+  const { Icon } = config
+
+  const toggleIndicator = (i) => {
+    setExpandedIndicators((prev) => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
+  const handleExport = () => {
+    const report = {
+      generatedAt: new Date().toISOString(),
+      tool: 'PhishGuard v1.0',
+      ...result,
+    }
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `phishguard-report-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="results animate-fade-in">
+      {/* Header bar */}
+      <div className="results-header">
+        <button className="results-back" onClick={onReset}>
+          <RotateCcw size={14} strokeWidth={1.5} />
+          Analyze Another Email
+        </button>
+        <button className="results-export" onClick={handleExport}>
+          <Download size={14} strokeWidth={1.5} />
+          Export JSON Report
+        </button>
+      </div>
+
+      {/* Verdict Card */}
+      <div className={`verdict-card verdict-card--${config.color}`}>
+        <div className="verdict-left">
+          <div className={`verdict-icon verdict-icon--${config.color}`}>
+            <Icon size={32} strokeWidth={1.5} />
+          </div>
+          <div>
+            <div className="verdict-label">Verdict</div>
+            <div className={`verdict-value verdict-value--${config.color}`}>{config.label}</div>
+            <p className="verdict-summary">{result.summary}</p>
+          </div>
+        </div>
+
+        <div className="verdict-scores">
+          <ScoreRing score={result.riskScore} label="Risk Score" type="risk" />
+          <ScoreRing score={result.confidence} label="Confidence" type="confidence" />
+        </div>
+      </div>
+
+      {/* Grid layout for sections */}
+      <div className="results-grid">
+        {/* Indicators */}
+        {result.indicators && result.indicators.length > 0 && (
+          <section className="results-section results-section--full">
+            <h2 className="section-title">
+              <AlertTriangle size={16} strokeWidth={1.5} />
+              Threat Indicators
+              <span className="section-badge">{result.indicators.length}</span>
+            </h2>
+            <div className="indicators-list">
+              {result.indicators.map((ind, i) => {
+                const sevConf = SEVERITY_CONFIG[ind.severity] || SEVERITY_CONFIG.MEDIUM
+                const CatIcon = CATEGORY_ICONS[ind.category] || AlertCircle
+                const isOpen = expandedIndicators.has(i)
+                return (
+                  <div key={i} className={`indicator indicator--${sevConf.color}`}>
+                    <button className="indicator-header" onClick={() => toggleIndicator(i)}>
+                      <div className="indicator-left">
+                        <span className={`indicator-sev indicator-sev--${sevConf.color}`}>
+                          {sevConf.label}
+                        </span>
+                        <CatIcon size={14} strokeWidth={1.5} style={{ flexShrink: 0, opacity: 0.6 }} />
+                        <span className="indicator-title">{ind.title}</span>
+                      </div>
+                      {isOpen ? <ChevronUp size={14} strokeWidth={1.5} /> : <ChevronDown size={14} strokeWidth={1.5} />}
+                    </button>
+                    {isOpen && (
+                      <div className="indicator-body">
+                        <p className="indicator-desc">{ind.description}</p>
+                        {ind.evidence && (
+                          <div className="indicator-evidence">
+                            <span className="indicator-evidence-label">Evidence:</span>
+                            <code className="indicator-evidence-text">{ind.evidence}</code>
+                          </div>
+                        )}
+                        <span className="indicator-category-badge">{ind.category.replace(/_/g, ' ')}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Sender Analysis */}
+        {result.senderAnalysis && (
+          <section className="results-section">
+            <h2 className="section-title">
+              <User size={16} strokeWidth={1.5} />
+              Sender Analysis
+            </h2>
+            <div className="sender-card">
+              <SenderRow label="Display Name" value={result.senderAnalysis.displayName} />
+              <SenderRow label="Email Address" value={result.senderAnalysis.emailAddress} mono />
+              <SenderRow label="Domain" value={result.senderAnalysis.domain} mono />
+              <div className="sender-row">
+                <span className="sender-row-label">Spoofing Detected</span>
+                <span className={`sender-bool ${result.senderAnalysis.spoofingDetected ? 'danger' : 'success'}`}>
+                  {result.senderAnalysis.spoofingDetected ? (
+                    <><XCircle size={13} strokeWidth={1.5} /> Yes</>
+                  ) : (
+                    <><CheckCircle size={13} strokeWidth={1.5} /> No</>
+                  )}
+                </span>
+              </div>
+              {result.senderAnalysis.spoofingDetails && result.senderAnalysis.spoofingDetected && (
+                <p className="sender-spoof-details">{result.senderAnalysis.spoofingDetails}</p>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* URL Analysis */}
+        {result.urlAnalysis && result.urlAnalysis.length > 0 && (
+          <section className="results-section">
+            <h2 className="section-title">
+              <Link2 size={16} strokeWidth={1.5} />
+              URL Analysis
+              <span className="section-badge">{result.urlAnalysis.length}</span>
+            </h2>
+            <div className="url-list">
+              {result.urlAnalysis.map((u, i) => (
+                <div key={i} className={`url-item ${u.suspicious ? 'url-item--danger' : 'url-item--safe'}`}>
+                  <div className="url-item-header">
+                    {u.suspicious ? (
+                      <XCircle size={14} strokeWidth={1.5} className="url-icon url-icon--danger" />
+                    ) : (
+                      <CheckCircle size={14} strokeWidth={1.5} className="url-icon url-icon--safe" />
+                    )}
+                    <code className="url-text">{u.url}</code>
+                  </div>
+                  <p className="url-reason">{u.reason}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Tactics */}
+        {result.tactics && result.tactics.length > 0 && (
+          <section className="results-section">
+            <h2 className="section-title">
+              <Tag size={16} strokeWidth={1.5} />
+              Attack Tactics
+            </h2>
+            <div className="tactics-list">
+              {result.tactics.map((t, i) => (
+                <span key={i} className="tactic-badge">{t}</span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Recommendations */}
+        {result.recommendations && result.recommendations.length > 0 && (
+          <section className="results-section results-section--full">
+            <h2 className="section-title">
+              <Lightbulb size={16} strokeWidth={1.5} />
+              Recommendations
+            </h2>
+            <ol className="recommendations-list">
+              {result.recommendations.map((r, i) => (
+                <li key={i} className="recommendation-item">
+                  <span className="recommendation-num">{i + 1}</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        {/* Technical Details */}
+        {result.technicalDetails && (
+          <section className="results-section results-section--full">
+            <h2 className="section-title">
+              <Info size={16} strokeWidth={1.5} />
+              Technical Details
+            </h2>
+            <div className="tech-details">
+              {result.technicalDetails.urgencyLevel && (
+                <div className="tech-row">
+                  <span className="tech-label">Urgency Level</span>
+                  <span className={`tech-urgency tech-urgency--${result.technicalDetails.urgencyLevel.toLowerCase()}`}>
+                    {result.technicalDetails.urgencyLevel}
+                  </span>
+                </div>
+              )}
+              {result.technicalDetails.encodingTricks && result.technicalDetails.encodingTricks !== 'None' && (
+                <div className="tech-row">
+                  <span className="tech-label">Encoding Tricks</span>
+                  <span className="tech-value">{result.technicalDetails.encodingTricks}</span>
+                </div>
+              )}
+              {result.technicalDetails.headerAnomalies && result.technicalDetails.headerAnomalies.length > 0 && (
+                <div className="tech-row tech-row--col">
+                  <span className="tech-label">Header Anomalies</span>
+                  <ul className="tech-anomalies">
+                    {result.technicalDetails.headerAnomalies.map((a, i) => (
+                      <li key={i} className="tech-anomaly">{a}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ScoreRing({ score, label, type }) {
+  const clamp = Math.min(100, Math.max(0, score || 0))
+  const color = type === 'risk'
+    ? clamp >= 70 ? 'var(--danger)' : clamp >= 40 ? 'var(--warning)' : 'var(--success)'
+    : 'var(--accent-blue)'
+
+  const r = 28
+  const circumference = 2 * Math.PI * r
+  const dashOffset = circumference - (clamp / 100) * circumference
+
+  return (
+    <div className="score-ring">
+      <svg width="72" height="72" viewBox="0 0 72 72" aria-label={`${label}: ${clamp}`}>
+        <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
+        <circle
+          cx="36" cy="36" r={r} fill="none"
+          stroke={color}
+          strokeWidth="5"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          strokeLinecap="round"
+          transform="rotate(-90 36 36)"
+          style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+        />
+        <text x="36" y="40" textAnchor="middle" fill="white" fontSize="14" fontWeight="600">
+          {clamp}
+        </text>
+      </svg>
+      <span className="score-ring-label">{label}</span>
+    </div>
+  )
+}
+
+function SenderRow({ label, value, mono }) {
+  return (
+    <div className="sender-row">
+      <span className="sender-row-label">{label}</span>
+      <span className={`sender-row-value ${mono ? 'mono' : ''}`}>{value || '—'}</span>
+    </div>
+  )
+}
